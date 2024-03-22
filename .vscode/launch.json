@@ -1,0 +1,24 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            // 第二步
+            // "args": ["--case", "person_0", "--conf", "./configs/example_config/neural_strands-monocular.yaml", "--exp_name", "first_stage_person_0","--gpu","4"],
+            // "args": ["--case", "person_0", "--conf", "./configs/monocular/neural_strands.yaml", "--exp_name", "first_stage_person_0","--gpu","4"],
+            // 第三步
+            "args": ["--case", "person_0", "--scene_type", "monocular", "--conf", "./configs/monocular/neural_strands_w_camera_fitted.yaml",  "--hair_conf", "./configs/hair_strands_textured.yaml", "--exp_name", "second_stage_person_0"],
+            "env":{
+                "PYTHONPATH": "${workspaceRoot}/npbgpp:${workspaceRoot}:${env:PYTHONPATH}"
+            },
+            "justMyCode": true
+        }
+    ]  
+}

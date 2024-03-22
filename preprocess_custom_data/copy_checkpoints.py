@@ -40,9 +40,9 @@ if __name__ == "__main__":
 
     parser.add_argument('--conf_path', default='./configs/example_config/monocular/neural_strands-monocular.yaml', type=str)
     
-    parser.add_argument('--case', default='person_1', type=str)
+    parser.add_argument('--case', default='person_0', type=str)
        
-    parser.add_argument('--exp_name', default='first_stage_reconctruction_person_1', type=str)  
+    parser.add_argument('--exp_name', default='first_stage_reconctruction_person_0', type=str)  
 
     
     args, _ = parser.parse_known_args()

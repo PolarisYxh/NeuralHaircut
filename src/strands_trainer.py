@@ -58,10 +58,10 @@ class StrandsTrainer:
     def train_step(self, model=None, it=0, raster_dict=None):
         losses = {}
 
-        self.strands_origins, z_geom, z_app, dif_dict = self.strands(it=it)
+        self.strands_origins, z_geom, z_app, dif_dict = self.strands(it=it)#self.strands_origins 1900,100,3
         strand_len = self.strands_origins.shape[1]
 
-        with freeze_gradients(model):
+        with freeze_gradients(model):#第二步得到的gt，#out:[190000,1],[190000, 256],[190000, 3]为sdf,feat,orient
             out = self.run_model(model, self.strands_origins.view(-1, 3))
 
         # Calculate origin loss

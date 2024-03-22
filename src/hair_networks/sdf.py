@@ -96,9 +96,9 @@ class HairSDFNetwork(nn.Module):
         print(self)
 
     def forward(self, inputs, calc_orient=False):
-        inputs = inputs * self.scale
+        inputs = inputs * self.scale #inputs [190000, 3]；
         if self.embed_fn_fine is not None:
-            inputs = self.embed_fn_fine(inputs)
+            inputs = self.embed_fn_fine(inputs)#input [190000, 51]
 
         x = inputs
         for l in range(0, self.num_layers - 1):
@@ -123,7 +123,7 @@ class HairSDFNetwork(nn.Module):
                 orients = torch.tanh(x[..., 1:4])
                 feats = x[..., 4:]
 
-            return torch.cat([sdf, feats, orients], dim=-1)
+            return torch.cat([sdf, feats, orients], dim=-1)#[190000, 1],[190000, 256],[190000, 3]
         
         else:
             sdf = x[..., :1] / self.scale

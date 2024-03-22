@@ -26,7 +26,7 @@ from datetime import datetime
 import math
 import random
 import yaml
-
+import json
 from src.models.cameras import OptimizableCameras
 
 from src.utils.util import set_seed
@@ -37,7 +37,7 @@ warnings.filterwarnings("ignore")
 
 
 class Runner:
-    def __init__(self, conf_path, mode='train', case='CASE_NAME', is_continue=False, checkpoint_name=None,  exp_name=None,  train_cameras=False):
+    def __init__(self, conf_path, mode='train', case='CASE_NAME', is_continue=False, checkpoint_name=None,  exp_name=None,  train_cameras=False,latest_model_name="/home/algo/yangxinhang/NeuralHaircut/exps_first_stage/first_stage_person_0/person_0/neural_strands-monocular/2024-01-04_11:25:52/checkpoints/ckpt_113000.pth"):
         self.device = torch.device('cuda')
 
         # Configuration of geometry      
@@ -162,7 +162,7 @@ class Runner:
             self.camera_model = None
     
         # Load checkpoint
-        latest_model_name = None
+        # latest_model_name = None
         if is_continue:
             model_list_raw = os.listdir(os.path.join(self.base_exp_dir, 'checkpoints'))
             model_list = []
@@ -459,7 +459,7 @@ class Runner:
         copyfile(self.conf_path, os.path.join(self.base_exp_dir, 'recording', 'config.yaml'))
 
     def load_checkpoint(self, checkpoint_name):
-        checkpoint = torch.load(os.path.join(self.base_exp_dir, 'checkpoints', checkpoint_name), map_location=self.device)
+        checkpoint = torch.load( checkpoint_name, map_location=self.device)
         self.nerf_outside.load_state_dict(checkpoint['nerf'])
         self.sdf_network.load_state_dict(checkpoint['sdf_network_fine'])
         self.deviation_network.load_state_dict(checkpoint['variance_network_fine'])
@@ -811,14 +811,32 @@ class Runner:
         os.makedirs(img_dir, exist_ok=True)
         cv.imwrite(os.path.join(img_dir, f'{self.iter_step}_{img_idx}.png'), img_fine)
 
-
+def readjson(file):
+    with open(file, 'r', encoding="utf-8") as load_f:
+        load_dict = json.load(load_f)
+    return load_dict
 if __name__ == '__main__':
     print('Hello Wooden')
-
+    workingDir = os.path.dirname(__file__)
     torch.set_default_tensor_type('torch.cuda.FloatTensor')
-
-    FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s"
-    logging.basicConfig(level=logging.DEBUG, format=FORMAT)
+    load_dict=readjson(os.path.join(workingDir,"config.json"))
+    from logger import Logger
+    log_path = workingDir + load_dict["log_path"]
+    os.makedirs(log_path, exist_ok=True)
+    cache_path = workingDir + load_dict["cache_path"]
+    os.makedirs(cache_path, exist_ok=True)
+    log2type = load_dict["log2type"]
+    log = Logger(log2type, log_path + 'service.log', level='info')
+    
+    # FORMAT = "[%(filename)s:%(lineno)s - %(funcName)20s() ] %(message)s", format=FORMAT
+    # log_file_path = os.path.join("logs", self.filename)
+    # logging.basicConfig(
+    #     filename=log_file_path,
+    #     level=logging.DEBUG,
+    #     format='%(asctime)s  %(filename)s : %(levelname)s  %(message)s',
+    #     filemode='a',
+    #     datefmt='%Y-%m-%d %A %H:%M:%S',
+    #     )
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--conf', type=str, default='./confs/base.conf')

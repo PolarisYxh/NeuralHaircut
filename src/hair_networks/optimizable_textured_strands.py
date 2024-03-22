@@ -116,8 +116,8 @@ class OptimizableTexturedStrands(nn.Module):
         self.geometry_descriptor_size = geometry_descriptor_size
         self.appearance_descriptor_size = appearance_descriptor_size
 
-        mgrid = torch.stack(torch.meshgrid([torch.linspace(-1, 1, texture_size)]*2))[None].cuda()
-        self.register_buffer('encoder_input', positional_encoding(mgrid, 6))
+        mgrid = torch.stack(torch.meshgrid([torch.linspace(-1, 1, texture_size)]*2))[None].cuda()#mgrid:[1, 2, 256, 256]，
+        self.register_buffer('encoder_input', positional_encoding(mgrid, 6))#encoder_input:[1, 26, 256, 256]
         
         # Initialize the texture decoder network
         self.texture_decoder = UNet(self.encoder_input.shape[1], geometry_descriptor_size + appearance_descriptor_size, bilinear=True)
@@ -219,8 +219,8 @@ class OptimizableTexturedStrands(nn.Module):
     def forward(self, it=None): 
         
         # Generate texture
-        texture = self.texture_decoder(self.encoder_input)
-        texture_res = texture.shape[-1]
+        texture = self.texture_decoder(self.encoder_input)#[1, 26, 256, 256]
+        texture_res = texture.shape[-1]#texture:[1, 80, 256, 256]
         
         # Use diffusion prior
         diffusion_dict = {}
@@ -257,28 +257,28 @@ class OptimizableTexturedStrands(nn.Module):
         else:
             idx = torch.randperm(self.max_num_strands, device=texture.device)[:self.num_strands]
 
-        origins = self.origins[idx]
-        uvs = self.uvs[idx]
+        origins = self.origins[idx]#[100000, 3],头皮采样的点，idx:1900
+        uvs = self.uvs[idx]#self.uvs [100000,2],头皮点对应的参数化纹理的坐标;uvs:[1900,2]
         local2world = self.local2world[idx]
 
         # Get latents for the samples
         z = F.grid_sample(texture, uvs[None, None])[0, :, 0].transpose(0, 1) # num_strands, C
-        z_geom = z[:, :self.geometry_descriptor_size]
+        z_geom = z[:, :self.geometry_descriptor_size]##[1900,80] to [1900,64]
         
         if self.appearance_descriptor_size:
             z_app = z[:, self.geometry_descriptor_size:]
         else:
             z_app = None
 
-        # Decode strabds
-        v = self.strand_decoder(z_geom) / self.scale_decoder  # [num_strands, strand_length - 1, 3]
+        # Decode strands
+        v = self.strand_decoder(z_geom) / self.scale_decoder  # v为顶点间的向量差值，[num_strands, strand_length - 1, 3],[1900, 99, 3]
 
         p_local = torch.cat([
                 torch.zeros_like(v[:, -1:, :]), 
                 torch.cumsum(v, dim=1)
             ], 
             dim=1
-        )
+        )#第一个顶点为[0,0,0]，后面累加
 
         p = (local2world[:, None] @ p_local[..., None])[:, :, :3, 0] + origins[:, None] # [num_strands, strang_length, 3]
         return p, z_geom, z_app,  diffusion_dict

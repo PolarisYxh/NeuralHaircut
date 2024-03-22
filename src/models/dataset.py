@@ -382,6 +382,7 @@ class MonocularDataset(Dataset):
         
 #         self.intrinsics_all = self.intrinsics_all.to(self.device)
 #         self.pose_all = self.pose_all.to(self.device)
+        print(self.intrinsics_all[0])
         self.intrinsics_all_inv = torch.inverse(self.intrinsics_all)  # [n_images, 4, 4]
         self.focal = self.intrinsics_all[0][0, 0]
         self.pose_all_inv = torch.inverse(self.pose_all)  # [n_images, 4, 4]

@@ -108,7 +108,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--conf_path', default='./configs/monocular/neural_strands.yaml', type=str)
         
-    parser.add_argument('--case', default='person_1', type=str)
+    parser.add_argument('--case', default='person_0', type=str)
     
     parser.add_argument('--scene_type', default='monocular', type=str, choices=['h3ds', 'monocular']) 
     

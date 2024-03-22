@@ -40,13 +40,14 @@ def check_visiblity_of_faces(cams, meshRasterizer, full_mesh, mesh_head, n_views
     vis_maps = []
     for cam in tqdm(range(len(cams))):
         v, _ = create_visibility_map(cams[cam], meshRasterizer, full_mesh)
+        idx=torch.nonzero(v)
         vis_maps.append(v)
 
     # took faces that were visible at least from n_views to reduce noise
     vis_mask = (torch.stack(vis_maps).sum(0) > n_views).float()
 
     idx = torch.nonzero(vis_mask).squeeze(-1).tolist()
-    idx = [i for i in idx if i > mesh_head.verts_packed().shape[0]]
+    # idx = [i for i in idx if i > mesh_head.verts_packed().shape[0]]
     indices_mapping = {j: i for i, j in enumerate(idx)}
 
     face_faces = []
@@ -66,10 +67,10 @@ def main(args):
     save_path = f'./implicit-hair-data/data/{scene_type}/{case}'
                              
     # upload mesh hair and bust
-    verts, faces = load_ply(os.path.join(save_path, 'final_hair.ply'))
+    verts, faces = load_ply(os.path.join(save_path, 'final_hair.ply'))#直接从头发场里提取的mesh，见run_geometry_reconstruction
     mesh_hair =  Meshes(verts=[(verts).float().to(args.device)], faces=[faces.to(args.device)])
 
-    verts_, faces_ = load_ply(os.path.join(save_path, 'final_head.ply'))
+    verts_, faces_ = load_ply(os.path.join(save_path, 'final_head.ply'))#直接从身体场里提取的mesh
     
     mesh_head =  Meshes(verts=[(verts_).float().to(args.device)], faces=[faces_.to(args.device)])
 
@@ -100,7 +101,7 @@ def main(args):
 
     # join hair and bust mesh to handle occlusions
     full_mesh = join_meshes_as_scene([mesh_head, mesh_hair])
-
+    full_mesh = mesh_head
 
     # take from config dataset parameters
     with open(args.conf_path, 'r') as f:
@@ -146,7 +147,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--conf_path', default='./configs/monocular/neural_strands.yaml', type=str)
     
-    parser.add_argument('--case', default='person_1', type=str)
+    parser.add_argument('--case', default='person_0', type=str)
     
     parser.add_argument('--scene_type', default='monocular', type=str) 
     

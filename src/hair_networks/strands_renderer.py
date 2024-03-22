@@ -76,9 +76,9 @@ class Renderer(nn.Module):
             torch.cat((z_app, torch.ones(self.num_strands, 1).cuda()), dim=1),
             raster_dict['cam_extr'],
             raster_dict['cam_intr']
-        )
+        )#[1, 18, 512, 512]
 
-        rasterized_features = rasterized[:, : self.feat_size, :, :]
+        rasterized_features = rasterized[:, : self.feat_size, :, :]#[1, 16, 512, 512]
         raster_dict['rasterized_img'] = rasterized_features[0]
         
         if self.use_orients_cond:

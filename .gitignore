@@ -127,3 +127,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+/implicit-hair-data
+/exps_first_stage
+/exps_second_stage
+*.pth
+SMPLX_NEUTRAL_2020.npz

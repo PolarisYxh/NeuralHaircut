@@ -88,7 +88,7 @@ class Runner:
 #         Upload volumetric geometry and surface orientation fields
         if train_conf['pretrain_path']:
             print('Upload sdf hair geometry and orientation field!')
-            checkpoint = torch.load(train_conf['pretrain_path'], map_location=self.device)
+            checkpoint = torch.load(train_conf['pretrain_path'], map_location=self.device)#第二步得到的sdf网络模型
             self.hair_network.load_state_dict(checkpoint['hair_network'])
 
 #         Upload strand-based geometry         
