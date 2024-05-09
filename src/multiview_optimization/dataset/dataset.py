@@ -10,7 +10,19 @@ import json
 from .openpose_data import OpenposeData
 import pickle
 from .cameras import OptimizableCameras
-
+from Util.get_face_info import get_face_info,angle2matrix
+import cv2
+def readjson(file):
+    with open(file, 'r', encoding="utf-8") as load_f:
+        load_dict = json.load(load_f)
+    return load_dict
+def drawLms(img, lms, color=(0, 255, 0),name = "1"):
+    img1 = img.copy()
+    for lm in lms:
+        cv2.circle(img1, tuple(lm), 2, color, 1)
+    cv2.imwrite(name+".png",img1)
+    # cv2.imshow(name,img1)
+    # cv2.waitKey()
 def load_K_Rt_from_P(filename, P=None):
     if P is None:
         lines = open(filename).read().splitlines()
@@ -38,11 +50,14 @@ class Multiview_dataset(Dataset):
     def __init__(self, image_path='', scale_path='', camera_path='' , openpose_kp_path='', pixie_init_path='', fitted_camera_path='', views_idx='',  device='cuda', batch_size=1):
         self.device = device
 
-        self.cams = np.load(camera_path)
-        self.scale_path = scale_path
-        self.image_path = image_path
-        self.openpose_kp_path = openpose_kp_path
-        self.pixie_init_path = pixie_init_path
+        self.cams = np.load(os.path.join(os.path.dirname(os.path.dirname(__file__)),camera_path))
+        self.scale_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),scale_path)
+        self.image_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),image_path)
+        self.openpose_kp_path = None
+        if openpose_kp_path!="":
+            self.openpose_kp_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),openpose_kp_path)
+            print(self.openpose_kp_path)
+        self.pixie_init_path = os.path.join(os.path.dirname(os.path.dirname(__file__)),pixie_init_path)
         self.batch_size = batch_size
         
         self.fitted_camera_path = fitted_camera_path
@@ -72,7 +87,7 @@ class Multiview_dataset(Dataset):
         else:
             world_mats_np = [self.cams['world_mat_%d' % idx].astype(np.float32) for idx in range(len(imgs_list_full) )]
             scale_mats_np = [self.cams['scale_mat_%d' % idx].astype(np.float32) for idx in range(len(imgs_list_full) )]
-     
+        # self.insight_face_info = get_face_info("Util"),False)
         intrinsics_all = []
         pose_all = []
         for scale_mat, world_mat in zip(scale_mats_np, world_mats_np):
@@ -110,35 +125,49 @@ class Multiview_dataset(Dataset):
         lmks3d = [fa3d.get_landmarks_from_image(images_np[i])[0]  if fa3d.get_landmarks_from_image(images_np[i]) else None for i in range(len(imgs_list))]  
 
         # took views that have openpose keypoints
-        data_openpose = []
-        sns = sorted(os.listdir(self.openpose_kp_path))
-        for sn in sns:
-            with open(os.path.join(self.openpose_kp_path, sn), 'r') as f:
-                data_openpose.append(json.load(f))
+        # self.good_views  = []
+        # mapping = dict(zip(filter_idx, np.arange(len(imgs_list))))
+        # unmapping = dict(zip(np.arange(len(imgs_list)), filter_idx))
+        
+        # for i in range(len(imgs_list)):
+        #     # faces, frames, framesForHair = self.insight_face_info.get_faces(images_np[i])
+        #     # if faces is not None:
+        #     #     self.good_views.append(mapping[i]) 
+        #     if lmks[i] is not None:
+        #         drawLms(images_np[i],lmks[i].astype('int'),name=f"{i}")
+        self.good_views = list(range(0,len(imgs_list_full)))
+        if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(__file__)),image_path,"../good_view.json")):
+            self.good_views  = readjson(os.path.join(os.path.dirname(os.path.dirname(__file__)),image_path,"../good_view.json"))['good_view']
+        self.openpose_data = None
+        if isinstance(self.openpose_kp_path,str):
+            data_openpose = []
+            self.good_views = []
+            sns = sorted(os.listdir(self.openpose_kp_path))
+            for sn in sns:
+                with open(os.path.join(self.openpose_kp_path, sn), 'r') as f:
+                    data_openpose.append(json.load(f))
 
-        self.good_views  = []
-        mapping = dict(zip(filter_idx, np.arange(len(imgs_list))))
-        unmapping = dict(zip(np.arange(len(imgs_list)), filter_idx))
+            mapping = dict(zip(filter_idx, np.arange(len(imgs_list))))
+            unmapping = dict(zip(np.arange(len(imgs_list)), filter_idx))
 
 
-        for i in range(len(data_openpose)):
-            if i in filter_idx:
-                if len(data_openpose[i]['people'])>0:
-                    if sum(data_openpose[i]['people'][0]['face_keypoints_2d']) > 0 and sum(data_openpose[i]['people'][0]['pose_keypoints_2d'])>0 :    
-                        self.good_views.append(mapping[i])        
+            for i in range(len(data_openpose)):
+                if i in filter_idx:
+                    if len(data_openpose[i]['people'])>0:
+                        if sum(data_openpose[i]['people'][0]['face_keypoints_2d']) > 0  and sum(data_openpose[i]['people'][0]['pose_keypoints_2d'])>0    :#
+                            self.good_views.append(mapping[i])     #[0, 9, 20, 24, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, ...]  32 
 
-
-        self.num_views = len(self.good_views)
-
+            self.openpose_data = OpenposeData(path=self.openpose_kp_path, views=self.good_views, device=self.device, filter_views_mapping=unmapping)    
         
         self.good_views = [i for i in self.good_views if lmks[i] is not None] # For some views otained landmarks could be bad
-        
+        print(f"filter good view:{self.good_views}")
+        self.num_views = len(self.good_views)
 #         self.good_views = [0, 9, 27, 28, 30, 31, 33, 34, 35, 63] # person_1
 
         self.nimages = min(len(self.good_views), self.batch_size)
+
+        # self.good_views = np.array(self.good_views)[::len(self.good_views)//self.nimages][:self.nimages]
         self.good_views = np.array(self.good_views)[:self.nimages]
-        
-        self.openpose_data = OpenposeData(path=self.openpose_kp_path, views=self.good_views, device=self.device, filter_views_mapping=unmapping)    
 
         self.lmks = torch.from_numpy(np.stack([lmks[i] for i in self.good_views]))
         self.lmks3d = torch.from_numpy(np.stack([lmks3d[i] for i in self.good_views]))
@@ -151,7 +180,8 @@ class Multiview_dataset(Dataset):
         
     def __getitem__(self, index):
         print(index)
-        return {
+        if self.openpose_data ==None:
+            return {
                 'img': self.images[index].to(self.device), 
                 'lmks': self.lmks[index].to(self.device),
                 'lmks3d':self.lmks3d[index].to(self.device), 
@@ -159,8 +189,19 @@ class Multiview_dataset(Dataset):
                 'extrinsics_tvec': self.poses[index, :3, 3].to(self.device),
                 'frame_ids': torch.tensor(index, dtype=torch.long).to(self.device),
                 'intrinsics': self.intrinsics_all[index].to(self.device),
-                'openpose_lmks': self.openpose_data.get_sample(index)
+                # 'openpose_lmks': self.openpose_data.get_sample(index)
                } 
+        else:
+            return {
+                    'img': self.images[index].to(self.device), 
+                    'lmks': self.lmks[index].to(self.device),
+                    'lmks3d':self.lmks3d[index].to(self.device), 
+                    'extrinsics_rvec': self.poses[index, :3, :3].to(self.device),
+                    'extrinsics_tvec': self.poses[index, :3, 3].to(self.device),
+                    'frame_ids': torch.tensor(index, dtype=torch.long).to(self.device),
+                    'intrinsics': self.intrinsics_all[index].to(self.device),
+                    'openpose_lmks': self.openpose_data.get_sample(index)
+                } 
     
     def __len__(self):
         return self.nimages 

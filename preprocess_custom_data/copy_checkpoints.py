@@ -8,7 +8,7 @@ def main(args):
     case = args.case
     conf_path = args.conf_path
 
-    exps_dir = Path('./exps_first_stage') / exp_name / case / Path(conf_path).stem
+    exps_dir = Path('/nvme0/yangxinhang/NeuralHaircut/exps_first_stage/') / exp_name / case / Path(conf_path).stem
     prev_exps = sorted(exps_dir.iterdir())
     cur_dir = prev_exps[-1].name      
 

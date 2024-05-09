@@ -13,6 +13,7 @@ def main(args):
     save_obj(os.path.join(path_to_scene, 'head_prior_wo_eyes.obj'), verts[idx_wo_eyes], faces_wo_eyes)
 
 if __name__ == "__main__":
+    import argparse
     parser = argparse.ArgumentParser(conflict_handler='resolve')
 
     parser.add_argument('--case', default='person_1', type=str)

@@ -37,7 +37,7 @@ warnings.filterwarnings("ignore")
 
 
 class Runner:
-    def __init__(self, conf_path, mode='train', case='CASE_NAME', is_continue=False, checkpoint_name=None,  exp_name=None,  train_cameras=False,latest_model_name="/home/algo/yangxinhang/NeuralHaircut/exps_first_stage/first_stage_person_0/person_0/neural_strands-monocular/2024-01-04_11:25:52/checkpoints/ckpt_113000.pth"):
+    def __init__(self, conf_path, mode='train', case='CASE_NAME', is_continue=False, checkpoint_name=None,  exp_name=None,  train_cameras=False,latest_model_name=None):
         self.device = torch.device('cuda')
 
         # Configuration of geometry      
@@ -48,7 +48,7 @@ class Runner:
 
         if exp_name is not None:
             date, time = str(datetime.today()).split('.')[0].split(' ')
-            exps_dir = Path('./exps_first_stage') / exp_name / case / Path(conf_path).stem
+            exps_dir = Path('/nvme0/yangxinhang/NeuralHaircut/exps_first_stage') / exp_name / case / Path(conf_path).stem
             if is_continue:
                 prev_exps = sorted(exps_dir.iterdir())
                 if len(prev_exps) > 0:
@@ -176,8 +176,8 @@ class Runner:
                 latest_model_name = model_list[-1]
 
         if latest_model_name is not None:
-            logging.info('Find checkpoint: {}'.format(latest_model_name))
-            self.load_checkpoint(latest_model_name)
+            logging.info('Find checkpoint: {}'.format(os.path.join(self.base_exp_dir, 'checkpoints',latest_model_name)))
+            self.load_checkpoint(os.path.join(self.base_exp_dir, 'checkpoints',latest_model_name))
 
         # Backup codes and configs for debug
         if self.mode[:5] == 'train':
@@ -203,10 +203,10 @@ class Runner:
             cam_intr = []
             sampled_pixels = []
             image_perm = []
-            for i in range(self.n_images_sampling):            
+            for i in range(self.n_images_sampling):#多视角图片中随机采样n_images_sampling次图，一次bs_sampling个像素，总共1024
                 dat, cintr, cpose, image_perms =  self.sample_one_image(batch=self.bs_sampling)             
-                cam_pose.append(cpose[None].repeat(self.bs_sampling, 1, 1))
-                cam_intr.append(cintr[None].repeat(self.bs_sampling, 1, 1))
+                cam_pose.append(cpose[None].repeat(self.bs_sampling, 1, 1))#[32,4,4]
+                cam_intr.append(cintr[None].repeat(self.bs_sampling, 1, 1))#[32,4,4]
                 sampled_pixels.append(dat)
                 image_perm.append(image_perms)
                 
@@ -239,10 +239,10 @@ class Runner:
             else:
                 cam_intr_ = cam_intr_0
                 cam_pose_ = cam_pose_0
-
-            p = torch.matmul(torch.linalg.inv(cam_intr_)[None, :3, :3], pixels[:, :, None]).squeeze() if len(cam_intr_.shape) < 3 else torch.matmul(torch.linalg.inv(cam_intr_)[:, :3, :3], pixels[:, :, None]).squeeze() # batch_size, 3
+            #https://zhuanlan.zhihu.com/p/389653208
+            p = torch.matmul(torch.linalg.inv(cam_intr_)[None, :3, :3], pixels[:, :, None]).squeeze() if len(cam_intr_.shape) < 3 else torch.matmul(torch.linalg.inv(cam_intr_)[:, :3, :3], pixels[:, :, None]).squeeze() # batch_size, 3；p:camera space
             rays_d = p / torch.linalg.norm(p, ord=2, dim=-1, keepdim=True)    # batch_size, 3
-            rays_d = torch.matmul(cam_pose_[None, :3, :3], rays_d[:, :, None]).squeeze() if len(cam_pose_.shape) < 3 else torch.matmul(cam_pose_[:, :3, :3], rays_d[:, :, None]).squeeze()# batch_size, 3
+            rays_d = torch.matmul(cam_pose_[None, :3, :3], rays_d[:, :, None]).squeeze() if len(cam_pose_.shape) < 3 else torch.matmul(cam_pose_[:, :3, :3], rays_d[:, :, None]).squeeze()# batch_size, 3，rays_d:world space归一化的方向向量，指向相机前方
             if len(cam_pose_.shape) < 3: 
                 rays_o = cam_pose_[None, :3, 3].expand(rays_d.shape) # batch_size, 3
             elif cam_pose_.shape[0] == 1:
@@ -323,7 +323,7 @@ class Runner:
 
             if self.orient_weight:
 
-                orient_angle_fine = project_orient_to_camera(orient_3d=sampled_orient_fine, org_3d=pts_fine, cam_intr=cam_intr, cam_extr=cam_extr)
+                orient_angle_fine = project_orient_to_camera(orient_3d=sampled_orient_fine, org_3d=pts_fine, cam_intr=cam_intr, cam_extr=cam_extr)#cam_extr:世界到相机投影
 
                 # Get masks for orientation loss
                 orient_mask = hair_mask

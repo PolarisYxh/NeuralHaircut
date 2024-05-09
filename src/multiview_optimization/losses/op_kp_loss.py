@@ -137,7 +137,7 @@ class OpenPoseLoss(DefaultLoss):
             self.jtr_inds = im.get_smplx_ids_op_rh()
             self.data_key = 'op_hand_right'
             self.conf_key = 'op_conf_hand_right'
-        if mode == 'face':
+        if mode == 'face':#进入这里
             self.jtr_inds = im.get_smplx_ids_op_face()
             self.data_key = 'op_face'
             self.conf_key = 'op_conf_face'

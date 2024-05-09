@@ -11,23 +11,25 @@ from scipy.spatial.transform import Rotation as R
     
 def main(args):
     
-    images_file = f'{args.path_to_scene}/sparse_txt/images.txt'
-    points_file = f'{args.path_to_scene}/sparse_txt/points3D.txt'
-    camera_file = f'{args.path_to_scene}/sparse_txt/cameras.txt'
+    images_file = f'{args.path_to_scene}/colmap/sparse_txt/images.txt'
+    points_file = f'{args.path_to_scene}/colmap/sparse_txt/points3D.txt'
+    camera_file = f'{args.path_to_scene}/colmap/sparse_txt/cameras.txt'
     
     # Parse colmap cameras and used images
+    intrinsic_matrixs = []
     with open(camera_file) as f:
         lines = f.readlines()
+        for line in lines[3:]:
+            u = float(line.split()[4])
+            h, w = [int(x) for x in lines[3].split()[5: 7]]
 
-        u = float(lines[3].split()[4])
-        h, w = [int(x) for x in lines[3].split()[5: 7]]
-
-        intrinsic_matrix = np.array([
-            [u, 0, h, 0],
-            [0, u, w, 0],
-            [0, 0, 1, 0],
-            [0, 0, 0, 1]
-        ])
+            intrinsic_matrix = np.array([
+                [u, 0, h, 0],
+                [0, u, w, 0],
+                [0, 0, 1, 0],
+                [0, 0, 0, 1]
+            ])
+            intrinsic_matrixs.append(intrinsic_matrix)
 
     # IMAGE_ID, QW, QX, QY, QZ, TX, TY, TZ, CAMERA_ID, NAME
     with open(images_file) as f:
@@ -54,9 +56,14 @@ def main(args):
         extrinsic_matrix[:3, :3] = R.from_quat(np.roll(q, -1)).as_matrix()
         extrinsic_matrix[:3, 3] = t
 
-        data[image_name] = intrinsic_matrix @ extrinsic_matrix    
+        data[image_name] = intrinsic_matrixs[i] @ extrinsic_matrix    
 
-
+    # x=np.load("/home/algo/yangxinhang/NeuralHaircut/implicit-hair-data/data/monocular/person_0/cameras.npz")
+    # print(x['arr_0'])
+    # print(len(x['arr_0']))
+    # sorted_dict_keys = sorted(data)
+    # from collections import OrderedDict
+    # data = OrderedDict((key, data[key]) for key in sorted_dict_keys)
     with open(points_file) as f:
         points_3d_lines = f.readlines()
 
@@ -77,7 +84,7 @@ def main(args):
     images_folder = os.path.join(args.path_to_scene, 'video_frames')
     
     os.makedirs(output_folder, exist_ok=True)
-    os.makedirs(os.path.join(output_folder, 'full_res_image'), exist_ok=True)
+    os.makedirs(os.path.join(output_folder, 'image'), exist_ok=True)
     
     cameras = []
     debug = False
@@ -86,17 +93,18 @@ def main(args):
         filename = f'img_{i:04}.png'
         T = data[k]
         cameras.append(T)
-        shutil.copyfile(os.path.join(images_folder, k), os.path.join(output_folder, 'full_res_image', filename))
+        shutil.copyfile(os.path.join(images_folder, k), os.path.join(output_folder, 'image', filename))
 
     np.savez(os.path.join(output_folder, 'cameras.npz'), np.stack(cameras))
+    print(f"has {len(cameras)} cameras")
     trimesh.points.PointCloud(points).export(os.path.join(output_folder, 'point_cloud.ply'));
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(conflict_handler='resolve')
 
-    parser.add_argument('--path_to_scene', default='./implicit-hair-data/data/monocular/person_1', type=str)
-    parser.add_argument('--save_path', default='./implicit-hair-data/data/monocular/person_1/colmap', type=str)
+    parser.add_argument('--path_to_scene', default='./implicit-hair-data/data/monocular/person_4', type=str)
+    parser.add_argument('--save_path', default='./implicit-hair-data/data/monocular/person_4', type=str)
 
     
     args, _ = parser.parse_known_args()

@@ -39,18 +39,34 @@ The full data folder is organized as follows:
 
 
 ### For the first stage you need the following:
+only_object.py:去除背景，得到人体照片
+#### Step 0. shot videos ,better square,if not Crop input images and postprocess cameras. 
+```
+run /home/algo/yangxinhang/NeuralHaircut/preprocess_custom_data/preprocess_video.py
+```
+如果视频是1:1的，则可以直接用下面命令
+```
+ffmpeg -i Frames.mp4 video_frames/Frame%05d.png -hide_banner
+将输入的视频文件 Frames.m4v 中的每一帧提取为PNG格式的图像，并保存到指定的目录 Frames 中，并且将文件名设置为 FrameXXXXX.png，其中 XXXXX 是帧的序号，使用5位数字进行填充。
 
+命令中的 -hide_banner 选项用于隐藏FFmpeg的版本信息和版权声明。
+```
 
+Note, now NeuralHaircut supports only the square images.
 
 #### Step 1. (Optional) Run [COLMAP SfM](https://colmap.github.io/) to obtain cameras. 
 
 ##### Run commands
-
+in colmap docker container，docker attach haircut-server
 ```bash
+docker attach haircut-server
+cd NeuralHaircut/implicit-hair-data/data/monocular
+mkdir person_5/colmap
 colmap automatic_reconstructor --workspace_path  CASE_NAME/colmap  --image_path CASE_NAME/video_frames
 ```
 
 ```bash
+cd /NeuralHaircut/implicit-hair-data/data/monocular
 mkdir CASE_NAME/colmap/sparse_txt && colmap model_converter --input_path CASE_NAME/colmap/sparse/0  --output_path CASE_NAME/colmap/sparse_txt --output_type TXT
 ```
 
@@ -59,16 +75,17 @@ mkdir CASE_NAME/colmap/sparse_txt && colmap model_converter --input_path CASE_NA
 ##### To postprocess COLMAP's output run:
 
 ```bash
-python colmap_parsing.py --path_to_scene  ./implicit-hair-data/data/SCENE_TYPE/CASE --save_path ./implicit-hair-data/data/SCENE_TYPE/CASE/colmap
+cd /NeuralHaircut
+python preprocess_custom_data/colmap_parsing.py --path_to_scene  ./implicit-hair-data/data/SCENE_TYPE/CASE --save_path ./implicit-hair-data/data/SCENE_TYPE/CASE
 ```
 ##### Obtain:
 
-After this step you would obtain ```colmap/full_res_image, colmap/cameras.npz, colmap/point_cloud.ply```
+After this step you would obtain ```image, cameras.npz, point_cloud.ply``` under ./implicit-hair-data/data/SCENE_TYPE/CASE
 
 
 #### Step 2.  (Optional) Define the region of interests in obtained point cloud.
 
-Obtained ```colmap/point_cloud.ply``` is very noisy, so we are additionally define the region of interest using MeshLab and upload it to the current folder as ```point_cloud_cropped.ply```.
+Obtained ```colmap/point_cloud.ply``` is very noisy, so we are additionally define the region of interest using MeshLab and upload it to the current folder as ```./implicit-hair-data/data/SCENE_TYPE/CASE/point_cloud_cropped.ply```.
 
 
 #### Step 3. Transform cropped scene to lie in a unit sphere volume.
@@ -76,18 +93,16 @@ Obtained ```colmap/point_cloud.ply``` is very noisy, so we are additionally defi
 ```bash
 python preprocess_custom_data/scale_scene_into_sphere.py --case CASE --scene_type SCENE_TYPE --path_to_data ./implicit-hair-data/data/
 ```
-After this step in```./implicit-hair-data/data/SCENE_TYPE/CASE``` you would obtain ```scale.pickle```.
+After this step in```./implicit-hair-data/data/SCENE_TYPE/CASE``` you would obtain ```scale.pickle``` and ```point_cloud_cropped_normalize.ply```.
 
 
-#### Step 4. (Optional) Crop input images and postprocess cameras. 
 
-Note, now NeuralHaircut supports only the square images.
 
 #### Step 5. Obtain hair, silhouette masks and orientation and confidence maps.
 
 
 ```bash
-python preprocess_custom_data/calc_masks.py --scene_path ./implicit-hair-data/data/SCENE_TYPE/CASE/ --MODNET_ckpt path_to_modnet --CDGNET_ckpt path_to_cdgnet
+python preprocess_custom_data/calc_masks.py --scene_path ./implicit-hair-data/data/SCENE_TYPE/CASE/ --MODNET_ckpt pretrained_models/modnet/modnet_photographic_portrait_matting.ckpt --CDGNET_ckpt pretrained_models/cdgnet/LIP_epoch_149.pth
 ```
 
 
@@ -104,7 +119,8 @@ After this step in```./implicit-hair-data/data/SCENE_TYPE/CASE``` you would obta
 
 #### Step 7. Using multiview images and cameras obtain FLAME head.
 
-FLAME head would be used to regularize the scalp region.
+FLAME head would be used to regularize the scalp region. 
+优化得到和Step 5归一化后的点云 差不多一个位姿的flame头 ./implicit-hair-data/data/SCENE_TYPE/CASE/head_prior.obj
 
 More details could be find in [multiview_optimization](../src/multiview_optimization)
 

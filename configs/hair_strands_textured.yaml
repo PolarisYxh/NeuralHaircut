@@ -5,7 +5,7 @@ sdf_chamfer: {
       }
       
 textured_strands: {
-      "path_to_mesh": "./implicit-hair-data/data/DATASET_TYPE/CASE_NAME/head_prior.obj",
+      "path_to_mesh": "./implicit-hair-data/data/DATASET_TYPE/CASE_NAME/head_prior_wo_eyes.obj",
       "decoder_checkpoint_path": "./pretrained_models/strand_prior/strand_ckpt.pth",
       "num_strands": 1900,
       "max_num_strands": 100000,

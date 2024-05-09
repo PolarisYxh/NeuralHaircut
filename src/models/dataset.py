@@ -130,7 +130,7 @@ class Dataset:
             ty = torch.linspace(0, self.H - 1, self.H)  # TODO: this code seems to be incorrect, because meshgrid reverses the order
             pixels_x, pixels_y = torch.meshgrid(tx, ty) #       of values: pixels_x change across i, pixels_y -- across j 
             p = torch.stack([pixels_x, pixels_y, torch.ones_like(pixels_y)], dim=-1) # W, H, 3
-            v = torch.matmul(self.intrinsics_all_inv[img_idx, None, None, :3, :3], p[:, :, :, None].cuda()).squeeze()  # W, H, 3
+            v = torch.matmul(self.intrinsics_all_inv[img_idx, None, None, :3, :3], p[:, :, :, None].cuda()).squeeze()  # W, H, 3，clip space
             
             ###
             ### Code below is borrowed from https://github.com/hjxwhy/mipnerf_pl/blob/master/datasets/datasets.py
@@ -160,10 +160,13 @@ class Dataset:
         return p, radii, orientation, self.intrinsics_all[img_idx], self.pose_all[img_idx]
         
     def gen_random_rays_at(self, img_idx, batch_size):
+        """Generate random rays at world space from one camera.
+
+        Returns:
+            第一个: 32*11,采样的32个像素*11个值
+            第二个：
         """
-        Generate random rays at world space from one camera.
-        """
-        if self.conf.get('mask_based_ray_sampling', False):
+        if self.conf.get('mask_based_ray_sampling', True):
             # Sample 50% hair rays, 45% foreground rays and 5% background rays
             num_pixels_bg = round(batch_size * 0.05)
             num_pixels_fg = round(batch_size * 0.45)
@@ -187,7 +190,7 @@ class Dataset:
 
         color = self.images[img_idx][(pixels_y, pixels_x)]    # batch_size, 3
         mask = self.masks[img_idx][(pixels_y, pixels_x)]      # batch_size, 3
-        radii = self.radii[img_idx][(pixels_y, pixels_x)]
+        radii = self.radii[img_idx][(pixels_y, pixels_x)]   #光线采样步长
         p = torch.stack([pixels_x, pixels_y, torch.ones_like(pixels_y)], dim=-1).float()  # batch_size, 3
             
         hair_mask = self.hair_masks[img_idx][(pixels_y, pixels_x)]
@@ -309,49 +312,96 @@ class MonocularDataset(Dataset):
         self.object_cameras_name = conf.get('object_cameras_name')
 
         self.views_idx = conf.get('views_idx', '')
-
-        camera_dict = np.load(os.path.join(self.data_dir, self.render_cameras_name))
-        
-        fitted_camera_path = conf.get('fitted_camera_path')
-
-        # Define scale into unit sphere
-        self.scale_mat = np.eye(4, dtype=np.float32)
-        if conf.get('path_to_scale', None) is not None:
-            with open(conf['path_to_scale'], 'rb') as f:
-                transform = pickle.load(f)
-                print('upload transform', transform, conf['path_to_scale'])
-                self.scale_mat[:3, :3] *= transform['scale']
-                self.scale_mat[:3, 3] = np.array(transform['translation'])
-    
+        self.images_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'image')))
         self.num_bins = conf.get('orient_num_bins')
         self.intrinsics_all = []
         self.pose_all = []
-
-        self.images_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'image')))
-
-        self.masks_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'mask')))
-#        load hair mask
-        self.hair_masks_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'hair_mask')))
-#             load orientations
-        self.orientations_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'orientation_maps')))
-#            load variance
-        self.variance_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'confidence_maps')))
-#         Load camera
-        self.cameras = camera_dict['arr_0']
-
-        if self.views_idx:
-            self.filter_views()
-
+        fitted_camera_path = conf.get('fitted_camera_path')
         self.n_images  = len(self.images_lis)
-        print("Number of views:", self.n_images) 
+        if "render" not in str(self.data_dir):
+            camera_dict = np.load(os.path.join(self.data_dir, self.render_cameras_name))
         
-        for i in range(self.n_images):
-            world_mat = self.cameras[i]  
-            P = world_mat @ self.scale_mat
-            P = P[:3, :4]
-            intrinsics, pose = load_K_Rt_from_P(None, P)                       
-            self.pose_all.append(torch.from_numpy(pose).float())
-            self.intrinsics_all.append(torch.from_numpy(intrinsics).float())     
+
+            # Define scale into unit sphere
+            self.scale_mat = np.eye(4, dtype=np.float32)
+            if conf.get('path_to_scale', None) is not None:
+                with open(conf['path_to_scale'], 'rb') as f:
+                    transform = pickle.load(f)
+                    print('upload transform', transform, conf['path_to_scale'])
+                    self.scale_mat[:3, :3] *= transform['scale']
+                    self.scale_mat[:3, 3] = np.array(transform['translation'])
+        
+        
+    #         Load camera
+            self.cameras = camera_dict['arr_0']
+
+            if self.views_idx:
+                self.filter_views()
+
+            
+            print("Number of views:", self.n_images) 
+            
+            for i in range(self.n_images):
+                world_mat = self.cameras[i]  
+                P = world_mat @ self.scale_mat
+                P = P[:3, :4]
+    #             array([[3.75710151e+03, 5.42521726e-07, 1.08000000e+03, 0.00000000e+00],
+                    #    [0.00000000e+00, 3.75710154e+03, 9.20000014e+02, 0.00000000e+00],
+                    #    [0.00000000e+00, 0.00000000e+00, 1.00000000e+00, 0.00000000e+00],
+                    #    [0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00]])
+    
+    # array([[ 9.9931878e-01,  2.1727411e-03, -3.6840763e-02, -8.3737085e-03],
+    #    [-5.4544699e-03,  9.9599755e-01, -8.9213945e-02, -6.7527540e-02],
+    #    [ 3.6499470e-02,  8.9354120e-02,  9.9533093e-01, -2.4245462e+00],
+    #    [ 0.0000000e+00,  0.0000000e+00,  0.0000000e+00,  1.0000000e+00]],
+    #   dtype=float32)
+                intrinsics, pose = load_K_Rt_from_P(None, P)                       
+                self.pose_all.append(torch.from_numpy(pose).float())
+                self.intrinsics_all.append(torch.from_numpy(intrinsics).float())     
+            self.masks_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'mask')))
+    #        load hair mask
+            self.hair_masks_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'hair_mask')))
+    #             load orientations
+            self.orientations_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'orientation_maps')))
+    #            load variance
+            self.variance_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'confidence_maps')))
+        else:
+            self.scale_mat = np.eye(4, dtype=np.float32)
+            if conf.get('path_to_scale', None) is not None:
+                with open(conf['path_to_scale'], 'rb') as f:
+                    transform = pickle.load(f)
+                    print('upload transform', transform, conf['path_to_scale'])
+                    self.scale_mat[:3, :3] *= transform['scale']
+                    self.scale_mat[:3, 3] = np.array(transform['translation'])
+            files = glob(os.path.join(self.data_dir,"camera","*"))
+            files = sorted(files,key=lambda x: int(os.path.basename(x).split('_')[-1].split('.')[0]))
+           
+            for file in files:
+                camera_dict = np.load(file,allow_pickle=True)
+                transform_matrix = camera_dict.item().get('transform')
+                calib_matrix1 = camera_dict.item().get('calib')
+                calib_matrix1[0,1]=0
+                calib_matrix1[1,0]=0
+                # world_mat = self.cameras[i]  
+                calib_matrix2 = np.identity(4)
+                # self.scale_mat = np.identity(4)
+                calib_matrix2[:2,:2]=calib_matrix1[:2,:2]
+                calib_matrix2[:2,2]=calib_matrix1[:2,2]
+                P = calib_matrix2@transform_matrix@ self.scale_mat
+                P = P[:3, :4]
+                
+                intrinsics, pose = load_K_Rt_from_P(None, P)                       
+                self.pose_all.append(torch.from_numpy(pose).float())
+                self.intrinsics_all.append(torch.from_numpy(intrinsics).float())   
+                
+                
+            self.masks_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'mask')),key=lambda x: int(os.path.basename(x).split('_')[-1].split('.')[0]))
+    #        load hair mask
+            self.hair_masks_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'hair_mask')),key=lambda x: int(os.path.basename(x).split('_')[-1].split('.')[0]))
+    #             load orientations
+            self.orientations_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'orientation_maps')),key=lambda x: int(os.path.basename(x).split('_')[-1].split('.')[0]))
+    #            load variance
+            self.variance_lis = sorted(glob_imgs(os.path.join(self.data_dir, 'confidence_maps')),key=lambda x: int(os.path.basename(x).split('_')[-1].split('.')[0]))
         
         self.images_np = np.stack([cv.imread(im_name) for im_name in self.images_lis]) / 255.0
         self.masks_np = np.stack([cv.imread(im_name) for im_name in self.masks_lis]) / 255.0
@@ -402,13 +452,13 @@ class MonocularDataset(Dataset):
             ty = torch.linspace(0, self.H - 1, self.H)  # TODO: this code seems to be incorrect, because meshgrid reverses the order
             pixels_x, pixels_y = torch.meshgrid(tx, ty) #       of values: pixels_x change across i, pixels_y -- across j 
             p = torch.stack([pixels_x, pixels_y, torch.ones_like(pixels_y)], dim=-1) # W, H, 3
-            v = torch.matmul(self.intrinsics_all_inv[img_idx, None, None, :3, :3], p[:, :, :, None].cuda()).squeeze()  # W, H, 3
+            v = torch.matmul(self.intrinsics_all_inv[img_idx, None, None, :3, :3], p[:, :, :, None].cuda()).squeeze()  # W, H, 3;v:clip space
             # Distance from each unit-norm direction vector to its x-axis neighbor.
-            dx = torch.sqrt(torch.sum((v[:-1, :, :] - v[1:, :, :]) ** 2, -1))
-            dx = torch.cat([dx, dx[-2:-1, :]], 0)
+            dx = torch.sqrt(torch.sum((v[:-1, :, :] - v[1:, :, :]) ** 2, -1))#  [2159, 2160]
+            dx = torch.cat([dx, dx[-2:-1, :]], 0)#  [2160, 2160],保存的clip space里两个像素的距离
             # Cut the distance in half, and then round it out so that it's
             # halfway between inscribed by / circumscribed about the pixel.
-            self.radii[img_idx] = dx * 2 / math.sqrt(12)
+            self.radii[img_idx] = dx * 2 / math.sqrt(12)# 约等于dx*0.57,这个经过处理的距离值应该位于“内接于像素”和“外接于像素”两种情况之间的一半位置。
         self.radii = self.radii.transpose(1, 2)[..., None] # [n_images, H, W, 1]
         print('Load data: End')
     

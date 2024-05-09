@@ -114,7 +114,14 @@ def valid(model, valloader, input_size, image_size, num_samples, gpus):
     parsing_preds = parsing_preds[:num_samples, :, :]
     return parsing_preds, hpreds_lst, wpreds_lst
 
-
+def remove_transparency(im, bg_colour=(255, 255, 255)):
+    if im.mode in ('RGBA', 'LA') or (im.mode == 'P' and 'transparency' in im.info):
+        alpha = im.convert('RGBA').split()[-1]
+        bg = Image.new("RGBA", im.size, bg_colour + (255,))
+        bg.paste(im, mask=alpha)
+        return bg
+    else:
+        return im
     
 def main(args):
     print("Start calculating masks!")
@@ -127,7 +134,7 @@ def main(args):
     
     tens_list = []
     for i in range(n_images):
-        tens_list.append(T.ToTensor()(Image.open(os.path.join(args.scene_path, 'image', images[i]))))
+        tens_list.append(T.ToTensor()(Image.open(os.path.join(args.scene_path, 'image', images[i])))[:3,:,:])
 
 #     load MODNET model for silhouette masks
     modnet = nn.DataParallel(MODNet(backbone_pretrained=False))
@@ -136,11 +143,23 @@ def main(args):
     modnet.eval().to(device)
     
     # Create silh masks
-    silh_list = []
-    for i in tqdm(range(len(tens_list))):
-        silh_mask = obtain_modnet_mask(tens_list[i], modnet, 512)
-        silh_list.append(silh_mask)
-        cv2.imwrite(os.path.join(args.scene_path, 'mask', images[i]), postprocess_mask(silh_mask)[0].astype(np.uint8))
+    if "render" in args.scene_path:
+        for i in tqdm(range(len(tens_list))):
+            img = np.asarray(T.ToTensor()(Image.open(os.path.join(args.scene_path, 'image', images[i])))).transpose((1,2,0))
+            img1 = np.ones((img.shape[0],img.shape[1],3),dtype='uint8')*255
+            img1[img[:,:,3]==0] = [0,0,0]
+            cv2.imwrite(os.path.join(args.scene_path, 'mask', images[i]), img1[:,:,0])
+            # img = cv2.imread(os.path.join(args.scene_path, 'image', images[i]))
+            # img1 = np.sum(img,axis=2)
+            # img = np.ones((img.shape[0],img.shape[1],3),dtype='uint8')*255
+            # img[img1<5] = [0,0,0]
+            # cv2.imwrite(os.path.join(args.scene_path, 'mask', images[i]), img)
+    else:
+        silh_list = []
+        for i in tqdm(range(len(tens_list))):
+            silh_mask = obtain_modnet_mask(tens_list[i], modnet, 512)
+            silh_list.append(silh_mask)
+            cv2.imwrite(os.path.join(args.scene_path, 'mask', images[i]), postprocess_mask(silh_mask)[0].astype(np.uint8))
     
     print("Start calculating hair masks!")
 #     load CDGNet for hair masks
@@ -167,18 +186,18 @@ def main(args):
     model.eval()
     model.cuda()
 
-    basenames = sorted([s.split('.')[0] for s in os.listdir(os.path.join(args.scene_path, 'image'))])
+    basenames = sorted([s for s in os.listdir(os.path.join(args.scene_path, 'image'))])
     input_size = (1024, 1024)
 
     raw_images = []
     images = []
     masks = []
     for basename in basenames:
-        img = Image.open(os.path.join(args.scene_path, 'image', basename + '.jpg'))
-        raw_images.append(np.asarray(img))
+        img = Image.open(os.path.join(args.scene_path, 'image', basename)).convert('RGB')
+        raw_images.append(np.asarray(img)[:,:,:3])
         img = transform(img.resize(input_size))[None]
         img = torch.cat([img, torch.flip(img, dims=[-1])], dim=0)
-        mask = np.asarray(Image.open(os.path.join(args.scene_path, 'mask', basename + '.jpg')))
+        mask = np.asarray(Image.open(os.path.join(args.scene_path, 'mask', basename)))
         images.append(img)
         masks.append(mask)
 
@@ -188,7 +207,7 @@ def main(args):
     for i in range(len(images)):
         hair_mask = np.asarray(Image.fromarray((parsing_preds[i] == 2)).resize(image_size, Image.BICUBIC))
         hair_mask = hair_mask * masks[i]
-        Image.fromarray(hair_mask).save(os.path.join(args.scene_path, 'hair_mask', basenames[i] + '.jpg'))
+        Image.fromarray(hair_mask).save(os.path.join(args.scene_path, 'hair_mask', basenames[i].split('.')[0] + '.jpg'))
    
     print('Results saved in folder: ', os.path.join(args.scene_path, 'hair_mask'))
         

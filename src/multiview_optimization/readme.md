@@ -13,7 +13,11 @@ Furthermore, use [OpenPose](https://github.com/CMU-Perceptual-Computing-Lab/open
 To obtain FLAME prior run:
 
 ```bash
-bash run_monocular_fitting.sh
+cd src/multiview_optimization
+python PIXIE/demos/demo_fit_face.py --input_path implicit-hair-data/data/monocular/person_7/image -save_path implicit-hair-data/data/monocular/person_7/pixie
+#修改 run_monocular_fitting.sh和multiview_optimization/conf下的conf文件
+bash scripts/run_monocular_fitting.sh
+
 ```
 To visualize the training process:
 
@@ -21,4 +25,6 @@ To visualize the training process:
 tensorboard --logdir ./experiments/EXP_NAME
 ```
 
-After training put obtained FLAME prior mesh.obj into the dataset folder ```./implicit-hair-data/data/SCENE_TYPE/CASE/head_prior.obj```.
+After training put obtained FLAME prior NeuralHaircut/src/multiview_optimization/experiments/fit_person_7_bs_20_train_rot_shape/mesh/mesh.obj into the dataset folder ```./implicit-hair-data/data/SCENE_TYPE/CASE/head_prior.obj```.
+
+check in meshlab if ```./implicit-hair-data/data/SCENE_TYPE/CASE/head_prior.obj and point_cloud_cropped_normalize.ply``` almost same,if so, steps before is right!

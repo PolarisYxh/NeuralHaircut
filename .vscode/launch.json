@@ -6,17 +6,38 @@
     "configurations": [
         {
             "name": "Python: Current File",
-            "type": "python",
+            "type": "debugpy",
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
-            // 第二步
-            // "args": ["--case", "person_0", "--conf", "./configs/example_config/neural_strands-monocular.yaml", "--exp_name", "first_stage_person_0","--gpu","4"],
-            // "args": ["--case", "person_0", "--conf", "./configs/monocular/neural_strands.yaml", "--exp_name", "first_stage_person_0","--gpu","4"],
-            // 第三步
-            "args": ["--case", "person_0", "--scene_type", "monocular", "--conf", "./configs/monocular/neural_strands_w_camera_fitted.yaml",  "--hair_conf", "./configs/hair_strands_textured.yaml", "--exp_name", "second_stage_person_0"],
+            // temp:
+            // "args": ["--path_to_scene",  "./implicit-hair-data/data/monocular/person_0_1", "--save_path", "./implicit-hair-data/data/monocular/person_0_1"],
+            // 第二步, "--train_cameras","--is_continue"
+            // "args": ["--case", "person_7","--conf", "./configs/monocular/neural_strands.yaml", "--exp_name", "first_stage_person_7","--gpu","4"],
+            // "args": ["--case", "person_0", "--train_cameras","--conf", "./configs/monocular/neural_strands.yaml", "--exp_name", "first_stage_person_0","--gpu","4"],
+            // "args": ["--case", "render_0","--conf", "./configs/monocular/neural_strands.yaml", "--exp_name", "first_stage_render_0","--gpu","4"],
+            // 第三步resnet101-imagenet.pth
+            // "args": ["--case", "person_1", "--scene_type", "monocular", "--conf", "./configs/monocular/neural_strands_w_camera_fitted.yaml",  "--hair_conf", "./configs/hair_strands_textured.yaml", "--exp_name", "second_stage_person_0"],
+            // preprocess_custom_data
+            // calc_masks.py
+            // "args": ["--scene_path", "./implicit-hair-data/data/monocular/person_4/", "--MODNET_ckpt", "pretrained_models/modnet/modnet_photographic_portrait_matting.ckpt",  "--CDGNET_ckpt", "pretrained_models/cdgnet/LIP_epoch_149.pth"],
+            // "args": ["--scene_path", "./implicit-hair-data/data/monocular/render_0/", "--MODNET_ckpt", "pretrained_models/modnet/modnet_photographic_portrait_matting.ckpt",  "--CDGNET_ckpt", "pretrained_models/cdgnet/LIP_epoch_149.pth"],
+            // calc_orientation_maps.py
+            // "args": ["--img_path", "./implicit-hair-data/data/monocular/person_4/image/", "--orient_dir", "./implicit-hair-data/data/monocular/person_4/orientation_maps", "--conf_dir", "./implicit-hair-data/data/monocular/person_4/confidence_maps"],
+            // "args": ["--img_path", "./implicit-hair-data/data/monocular/render_0/image/", "--orient_dir", "./implicit-hair-data/data/monocular/render_0/orientation_maps", "--conf_dir", "./implicit-hair-data/data/monocular/render_0/confidence_maps"],
+            //preprocess/colmap_parsing.py
+            // "args": ["--path_to_scene",  "./implicit-hair-data/data/monocular/person_7", "--save_path", "./implicit-hair-data/data/monocular/person_7/colmap"]
+            // src/multiview_optimization/fit.py
+            // "args": ["--conf", "src/multiview_optimization/confs/train_person_0.conf", "--batch_size", "1", "--train_rotation", "True", "--save_path", "./experiments/fit_person_0_bs_1"],
+            // "args1":["--conf", "src/multiview_optimization/confs/train_person_0.conf", "--batch_size", "5", "--train_rotation", "True", "--train_shape", "True", "--save_path", "./experiments/fit_person_0_bs_5","--checkpoint_path", "./experiments/fit_person_0_bs_1/opt_params"],
+            // "args2": ["--conf", "src/multiview_optimization/confs/train_person_0.conf", "--batch_size", "20", "--train_rotation", "True", "--train_shape", "True", "--save_path",  "./experiments/fit_person_0_bs_20_train_rot_shape",  "--checkpoint_path", "./experiments/fit_person_0_bs_5/opt_params"],
+            // "args": ["--conf", "src/multiview_optimization/confs/train_person_7.conf", "--batch_size", "1", "--train_rotation", "True", "--save_path", "./experiments/fit_person_7_bs_1"],
+            // "args1":["--conf", "src/multiview_optimization/confs/train_person_5.conf", "--batch_size", "5", "--train_rotation", "True", "--train_shape", "True", "--save_path", "./experiments/fit_person_5_bs_5","--checkpoint_path", "./experiments/fit_person_5_bs_1/opt_params"],
+            // "args2": ["--conf", "src/multiview_optimization/confs/train_person_5.conf", "--batch_size", "20", "--train_rotation", "True", "--train_shape", "True", "--save_path",  "./experiments/fit_person_5_bs_20_train_rot_shape",  "--checkpoint_path", "./experiments/fit_person_5_bs_5/opt_params"],
+            // src/multiview_optimization/PIXIE/demos/demo_fit_face.py
+            // "args":["--saveObj", "True", "--showBody", "True","--saveParam","True"],
             "env":{
-                "PYTHONPATH": "${workspaceRoot}/npbgpp:${workspaceRoot}:${env:PYTHONPATH}"
+                "PYTHONPATH": "${workspaceRoot}/src/multiview_optimization:${workspaceRoot}/CDGNet:${workspaceRoot}/npbgpp:${workspaceRoot}:${env:PYTHONPATH}"
             },
             "justMyCode": true
         }
